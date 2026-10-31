@@ -2,6 +2,8 @@
 
 TypeScript 面向对象的 SVG 命令行编辑器。支持六种图形、嵌套分组、SVG 读写与撤销重做。
 
+Git 仓库：[https://github.com/by088/-](https://github.com/by088/-)（克隆地址：`https://github.com/by088/-.git`）。
+
 ## 运行
 
 需要 Node.js 20 或更高版本。在本目录执行：
@@ -20,7 +22,7 @@ npm run --silent cli < examples/flowchart.commands
 运行该脚本会生成 `examples/flowchart.svg`，可直接在浏览器打开。
 也可以 `npm run build` 后运行 `node dist/main.js`。
 
-- [架构与实现说明](doc/README.md)
+- [项目文档](doc/README.md)
 - [PlantUML 架构图源码](doc/architecture.puml)
 - [流程图命令脚本](examples/flowchart.commands)
 - [生成的流程图](examples/flowchart.svg)

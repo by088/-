@@ -1,5 +1,9 @@
 # Lab1 Phase 1：SVG 编辑器（CLI）
 
+Git 仓库：[https://github.com/by088/-](https://github.com/by088/-)。
+
+克隆地址：`https://github.com/by088/-.git`。
+
 ## 项目说明与运行
 
 本项目实现六种内置类型 `rect / circle / ellipse / line / text / g`、19 个命令、SVG 文件读写和一条编辑命令一个撤销单元。`box` 创建及插件加载属于后续阶段，当前报未知类型。
@@ -25,7 +29,7 @@ node dist/main.js
 
 `examples/flowchart.commands` 是可执行的流程图案例，运行后生成 `examples/flowchart.svg`。浏览器直接打开 SVG 即可预览。`examples/other.svg` 展示外部文件导入时的自动补 ID 行为。
 
-## 架构与实现
+## 架构方案
 
 ### 1. 模块划分
 
@@ -45,6 +49,7 @@ src/
 ├── domain/                 图形类层次、几何验证、树结构与重组规则
 └── infrastructure/         XML 编解码、变换规范化、真实文件系统
 
+test/                       功能、文件读写、CLI 与架构检查
 examples/                   可回放命令与 SVG 示例
 doc/                        本文与 PlantUML 源码
 ```
@@ -136,8 +141,11 @@ package "src/infrastructure" {
 | `cli` | 自身、`application`、Node 流/终端 API | CLI 负责输入输出，不直接编辑领域树或访问 XML。 |
 | `infrastructure` | 自身、`application` 的存储端口、`domain`、Node 文件 API、XML 库 | 实现端口并完成外部表示与领域模型间的转换。 |
 | `main.ts` | 所有生产模块 | 组合根允许装配所有依赖。 |
+| `test` | 被测模块、Node 测试工具 | 独立验证功能与架构，不被生产模块引用。 |
 
 `application` 通过 `SvgStore` 端口使用存储能力，由 `main.ts` 注入具体适配器；`domain` 不依赖应用层、CLI 或基础设施；`cli` 通过应用层命令执行业务操作。
+
+`application → infrastructure`、`domain → application/cli/infrastructure`、`cli → domain/infrastructure` 均不允许。发现这类导入时应调整接口或移动职责，不能通过修改规则消除问题。
 
 ### 4. 变化点假设
 
@@ -149,6 +157,85 @@ package "src/infrastructure" {
 | 大文档与长历史 | 快照策略集中在 `EditCommand`；未来引入差量 Memento、容量限制和 ID 索引。当前搜索/唯一性检查采用树遍历，优先可读性与正确性。 |
 | 输出格式、国际化 | 显示集中在 `TreeFormatter`，提示主要位于具体命令。未建立本阶段用不到的翻译框架。 |
 | 支持更完整的 SVG/CSS/变换 | `SvgCodec` 与 `Transform` 隔离导入限制；无法支持的可视结构明确报错，避免静默损失。 |
+
+## 过程记录
+
+项目使用 Codex 协作完成。以下记录围绕实现中的关键决策及后续复核，依据代码、已有开发历史和实际运行结果整理。
+
+1. **先确定边界，再组织实现。** 开发历史先建立 TypeScript 工程和四层方案，再实现领域模型，随后接入命令、CLI 和存储适配器，最后补充测试与文档。将 `box` 留在后续插件阶段，避免把尚未实现的插件能力写成当前功能。
+2. **确定编辑失败的处理方式。** 分组会同时修改多个父容器，递归缩放也可能在后续子节点溢出。复核 `EditCommand.execute()` 时确认，操作先作用于文档副本，全部成功后才替换会话文档并记录历史；测试用后续子节点溢出的情况检查前面节点也不会留下部分修改。
+3. **核对外部 SVG 的 ID 分配。** 直接给第一个未命名矩形分配 `rect1`，可能与文件后面显式声明的 `rect1` 冲突。现有 `SvgCodec` 先遍历并保留所有显式 ID，再分配缺失 ID；对应测试覆盖该冲突场景、重复 ID 和警告内容。
+4. **明确容器和叶子的统一操作。** 检查命令与图形模型后，保留 `Shape` 的多态协议：移动和缩放由 `Group` 递归调用子节点，命令无需按标签判断图形；普通组样式通过 SVG 继承规则生效。`ungroup` 保留组中可继承的样式，避免解组后外观无故变化。
+5. **核对保存再读回的语义。** 检查不只比较生成的 XML 文本，还比较图形属性、层级、顺序与文本内容。现有用例覆盖 Unicode、XML 转义、自动 ID、根 ID 和嵌套变换；不支持的 SVG 结构明确拒绝，避免静默丢失内容。
+6. **运行并核对结果。** 在 Windows、Node.js 24.15.0 环境下执行严格编译和现有测试，结果为 39 项全部通过；另已回放流程图脚本，生成包含 8 个元素的 SVG。根据这些结果描述已实现范围，不把未做的浏览器视觉比对或性能测量写成已完成。
+
+## 一致性自查
+
+### 1. 模块划分
+
+实际目录与方案一致：`cli`、`application`、`domain`、`infrastructure` 对应四层职责，`main.ts` 负责装配。`application/commands` 是应用层内部的细分；`Transform` 位于基础设施层，负责 SVG 导入变换，均未改变依赖边界。
+
+生产类使用独立文件，文件名与类名一致。图形身份、样式、几何状态、组内节点和历史栈由类封装；图形类同时承担变换、属性校验和复制行为。没有用公共数据袋配合按标签分派的过程式函数代替图形模型。
+
+当前目录没有需要另行记录的架构偏离。两个名称映射仍是已在方案中标明的后续重构项。
+
+### 2. 依赖方向
+
+按源码导入关系抽查如下：
+
+| 源码位置 | 实际依赖 | 与方案的对应关系 |
+|---|---|---|
+| `application/commands/MoveCommand.ts` | `EditCommand`、`SvgDocument`、`Value` | 应用层依赖自身和领域层。 |
+| `application/Session.ts` | `History`、`SvgStore`、`SvgDocument`、`EditorError` | 会话依赖存储端口，不依赖文件适配器。 |
+| `domain/Group.ts` | `Shape`、`Value`、`EditorError` | 领域层依赖内部类型。 |
+| `cli/CommandProcessor.ts` | `CommandRegistry`、`Session`、`Tokenizer` | CLI 通过应用层执行业务，不直接依赖领域树或 XML。 |
+| `infrastructure/FileSvgStore.ts` | `SvgStore`、`SvgCodec`、`SvgDocument` 与 Node API | 基础设施实现应用层端口，并负责外部 IO。 |
+
+上述抽查未发现违规依赖。架构检查还辅助检查一类一文件及源码中的 `switch`；跨层规则仍结合源码审阅判断。现有架构测试按 `/` 拆分路径，在 Windows 上存在反斜杠路径识别不足，因此不能仅凭该测试通过就认定所有依赖均已检查；其路径处理是待完善项。
+
+## 质量保证手段
+
+### 功能完整性
+
+将命令和关键状态转换对应到可运行用例，而不是只检查程序能否启动。
+
+| 范围 | 检查内容 | 对应文件 |
+|---|---|---|
+| 六种图形与编辑 | 创建、显式父容器、属性白名单、默认样式、移动、缩放、删除 | `test/editor.test.ts` |
+| 组合结构 | 嵌套操作、分组顺序、跨父级分组、环检查、解组、z-order | `test/editor.test.ts` |
+| 撤销重做与失败处理 | 一条编辑一个单元、IO 屏障、新编辑清空 redo、失败不改变文档及历史 | `test/editor.test.ts` |
+| SVG 读写 | 自动 ID、重复 ID、转义、Unicode、嵌套变换、保存再读回、真实文件读写失败 | `test/svg.test.ts` |
+| 命令行 | 引号与转义、注释、提示符、CRLF、错误后继续执行、退出码 | `test/cli.test.ts` |
+| 代码组织 | 一类一文件、类名与文件名、名称分派及依赖检查 | `test/architecture.test.ts`，结合源码抽查 |
+
+### 已执行结果与复现方式
+
+已执行 `npm run check`，TypeScript 严格编译成功，测试结果为 **39 tests / 39 pass / 0 fail**。已运行流程图脚本，生成 `examples/flowchart.svg`，包含两组节点及连接线，共 8 个元素。
+
+在工程目录可复现编译和测试：
+
+```sh
+npm ci
+npm run check
+```
+
+在 Windows PowerShell 中回放示例：
+
+```powershell
+Get-Content -Encoding utf8 examples/flowchart.commands | npm run --silent cli
+```
+
+在支持输入重定向的终端中也可使用：
+
+```sh
+npm run --silent cli < examples/flowchart.commands
+```
+
+### 质量依据与限制
+
+对状态正确性的信心主要来自事务副本、深拷贝历史、参数校验以及覆盖失败路径的用例；对结构的检查来自模块职责、明确的依赖规则和源码抽查。测试还包含多次混合编辑后的逐步撤销与重放，用于检查历史状态是否被后续操作污染。
+
+目前未做跨浏览器像素比对、超大文档性能压测或完整 SVG 标准兼容性验证。快照历史的时间和空间开销随文档规模与历史长度增长；支持的 SVG 子集及已知限制见下文。这些边界不能由 39 项测试通过推导为已经解决。
 
 ## 行为约定与阶段边界
 
