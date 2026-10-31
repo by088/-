@@ -1,0 +1,50 @@
+@startuml
+skinparam componentStyle rectangle
+package "src/cli" {
+  [Repl]
+  [Tokenizer]
+  [CommandProcessor]
+}
+package "src/application" {
+  [CommandRegistry]
+  [Command / EditCommand]
+  [Concrete Commands]
+  [Session / History]
+  [TreeFormatter]
+  interface SvgStore
+}
+package "src/domain" {
+  [SvgDocument]
+  [Shape / GeometryShape]
+  [Rect / Circle / Ellipse / Line / Text]
+  [Group]
+  [ShapeFactory]
+}
+package "src/infrastructure" {
+  [FileSvgStore]
+  [SvgCodec / Transform]
+}
+[main.ts] --> [Repl]
+[main.ts] --> [Session / History]
+[main.ts] --> [FileSvgStore]
+[Repl] --> [CommandProcessor]
+[CommandProcessor] --> [Tokenizer]
+[CommandProcessor] --> [CommandRegistry]
+[CommandRegistry] --> [Concrete Commands]
+[Concrete Commands] --> [Command / EditCommand]
+[Concrete Commands] --> [Session / History]
+[Concrete Commands] --> [TreeFormatter]
+[Concrete Commands] --> [SvgDocument]
+[Concrete Commands] --> [ShapeFactory]
+[Session / History] --> SvgStore
+[Session / History] --> [SvgDocument]
+[SvgDocument] --> [Group]
+[Group] --> [Shape / GeometryShape]
+[Rect / Circle / Ellipse / Line / Text] --> [Shape / GeometryShape]
+[ShapeFactory] --> [Group]
+[ShapeFactory] --> [Rect / Circle / Ellipse / Line / Text]
+[FileSvgStore] ..|> SvgStore
+[FileSvgStore] --> [SvgCodec / Transform]
+[SvgCodec / Transform] --> [SvgDocument]
+[SvgCodec / Transform] --> [ShapeFactory]
+@enduml
