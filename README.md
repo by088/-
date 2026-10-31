@@ -27,4 +27,4 @@ npm run --silent cli < examples/flowchart.commands
 - [生成的流程图](examples/flowchart.svg)
 - [外部 SVG 导入样例](examples/other.svg)
 
-已通过 TypeScript 严格编译和 39 项自动化测试。项目包含分阶段 Git 提交，最终版本使用本地 `final` 标签。按用户确认的交付范围，无需推送远程仓库。
+已通过 TypeScript 严格编译和 39 项自动化测试。项目保留分阶段 Git 提交历史。按作业要求，代码及指向最终提交的 `final` 标签均须在截止时间前推送至 [GitHub 仓库](https://github.com/by088/-)；仅保留本地标签不算完成远程提交。当前未提供具体截止时间。
