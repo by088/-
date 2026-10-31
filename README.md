@@ -1,4 +1,4 @@
-# SVG Editor — Lab1 Phase 1
+# Lab1 Phase 1：SVG 编辑器（CLI）
 
 TypeScript 面向对象的 SVG 命令行编辑器。支持六种图形、嵌套分组、SVG 读写与撤销重做。
 
@@ -27,4 +27,4 @@ npm run --silent cli < examples/flowchart.commands
 - [生成的流程图](examples/flowchart.svg)
 - [外部 SVG 导入样例](examples/other.svg)
 
-已通过 TypeScript 严格编译和 39 项自动化测试。项目保留分阶段 Git 提交历史。按作业要求，代码及指向最终提交的 `final` 标签均须在截止时间前推送至 [GitHub 仓库](https://github.com/by088/-)；仅保留本地标签不算完成远程提交。当前未提供具体截止时间。
+项目采用分阶段 Git 提交管理，最终版本以 `final` 标签标记。已通过 TypeScript 严格编译和 39 项自动化测试，验证范围与结果详见 [质量保证手段](doc/README.md#质量保证手段)。
