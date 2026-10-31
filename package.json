@@ -4,8 +4,8 @@
   "type": "module", "engines": {"node": ">=20"},
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "cli": "tsx src/main.ts",
-    "test": "tsx --test test/*.test.ts",
+    "cli": "node --import tsx src/main.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "check": "npm run build && npm test"
   },
   "dependencies": {"@xmldom/xmldom": "^0.8.11"},
