@@ -2,9 +2,9 @@
 
 ## 项目说明与运行
 
-本项目实现任务文档的 Phase 1：六种内置类型 `rect / circle / ellipse / line / text / g`，全部 19 个命令，SVG 文件读写和一条编辑命令一个撤销单元。`box` 创建及插件加载属于后续阶段，本阶段明确报未知类型。
+本项目实现六种内置类型 `rect / circle / ellipse / line / text / g`、19 个命令、SVG 文件读写和一条编辑命令一个撤销单元。`box` 创建及插件加载属于后续阶段，当前报未知类型。
 
-环境：Node.js ≥ 20，npm。开发验证使用 Node.js 20.18.3。运行时 XML 依赖为 `@xmldom/xmldom`，开发依赖为 TypeScript、tsx 与 Node 类型声明；确切版本由 `package-lock.json` 固定。
+环境：Node.js ≥ 20，npm。运行时 XML 依赖为 `@xmldom/xmldom`，开发依赖为 TypeScript、tsx 与 Node 类型声明；确切版本由 `package-lock.json` 固定。
 
 在工程根目录执行：
 
@@ -18,15 +18,14 @@ npm run cli
 交互界面使用 `svg>` 提示符；Ctrl-D 结束输入。脚本模式不输出提示符，支持空行、CRLF 和以 `#` 开头的整行注释；发生错误继续处理下一行，结束时返回非零退出码。颜色中的 `#` 不被当成注释。不支持行尾注释。
 
 ```sh
-npm run check
 npm run --silent cli < examples/flowchart.commands
 npm run build
 node dist/main.js
 ```
 
-`examples/flowchart.commands` 是任务中版本 A 的完整可执行流程图案例，运行后生成 `examples/flowchart.svg`。浏览器直接打开 SVG 即可预览。另有 `examples/other.svg` 用于验证外部文件自动补 ID。
+`examples/flowchart.commands` 是可执行的流程图案例，运行后生成 `examples/flowchart.svg`。浏览器直接打开 SVG 即可预览。`examples/other.svg` 展示外部文件导入时的自动补 ID 行为。
 
-## 架构方案
+## 架构与实现
 
 ### 1. 模块划分
 
@@ -46,7 +45,6 @@ src/
 ├── domain/                 图形类层次、几何验证、树结构与重组规则
 └── infrastructure/         XML 编解码、变换规范化、真实文件系统
 
-test/                       功能、集成、架构验收
 examples/                   可回放命令与 SVG 示例
 doc/                        本文与 PlantUML 源码
 ```
@@ -117,7 +115,7 @@ package "src/infrastructure" {
 
 ### 2. 设计模式及代码落地
 
-**Command（必选）**：`Command` 定义执行协议，每种命令对应一个类，如 `MoveCommand`、`GroupCommand`。命令分发只创建对象，业务通过多态调用 `execute()`。编辑命令继承 `EditCommand`，具体类只实现 `apply(document)`；文档类、显示类与历史类直接继承 `Command`，不会意外进入编辑历史。
+**Command**：`Command` 定义执行协议，每种命令对应一个类，如 `MoveCommand`、`GroupCommand`。命令分发只创建对象，业务通过多态调用 `execute()`。编辑命令继承 `EditCommand`，具体类只实现 `apply(document)`；文档类、显示类与历史类直接继承 `Command`，不会意外进入编辑历史。
 
 **Composite**：`Shape` 提供统一的 `move / scale / set / clone / children` 接口。叶子图形在自身封装的几何字段上变换，`Group` 将移动与缩放递归作用于子节点。`MoveCommand` 和 `ScaleCommand` 不判断图形标签。容器 `set fill` 等设置 SVG 可继承属性，序列化后由 SVG 的继承规则作用于没有显式覆盖的后代。删除在文档层统一摘除任意节点，容器自然携带整棵子树。
 
@@ -138,9 +136,8 @@ package "src/infrastructure" {
 | `cli` | 自身、`application`、Node 流/终端 API | CLI 负责输入输出，不直接编辑领域树或访问 XML。 |
 | `infrastructure` | 自身、`application` 的存储端口、`domain`、Node 文件 API、XML 库 | 实现端口并完成外部表示与领域模型间的转换。 |
 | `main.ts` | 所有生产模块 | 组合根允许装配所有依赖。 |
-| `test` | 被测模块、Node 测试工具 | 测试是独立的验证入口，不被生产代码引用。 |
 
-`application → infrastructure`、`domain → application/cli/infrastructure`、`cli → domain/infrastructure` 均属于违规依赖。架构测试扫描相对导入，验证模块层级，并检查领域层/应用层没有第三方或 Node API 导入；另检查每个文件最多一个导出类，类名与文件名一致。对于基础设施对应用层的依赖，测试检查到模块级别，接口级限制仍需审阅。
+`application` 通过 `SvgStore` 端口使用存储能力，由 `main.ts` 注入具体适配器；`domain` 不依赖应用层、CLI 或基础设施；`cli` 通过应用层命令执行业务操作。
 
 ### 4. 变化点假设
 
@@ -177,7 +174,7 @@ create g <id>
 
 `fill / stroke` 省略时不写入，遵循 SVG 原生默认值。`set` 仅允许公共 `fill / stroke / stroke-width`、对应图形的几何字段，以及文字的 `text`；不允许修改 `id`。文字中的双引号、反斜杠及换行/制表可分别使用 `\"`、`\\`、`\n`、`\t`；空内容使用 `""`。
 
-### 对需求中未完全指定行为的明确选择
+### 主要操作语义
 
 - ID 唯一且大小写敏感；拒绝空 ID、空白和不适合作为 ID 的引号/尖括号等字符。读入时预扫描所有显式 ID，然后从 `标签1` 开始补号并避开现有 ID，成功导入后才输出警告。外部根 `<svg>` 的 ID 保留并占用名称，但根不是可编辑图形。
 - `init` 默认为 800×600；只给宽度时高度默认 600。`canvas` 查询无需参数，修改必须同时给宽、高；画布宽高必须为有限正数。
@@ -187,7 +184,7 @@ create g <id>
 - `front` 移到同级列表末端（最后绘制、视觉最前）；`back` 移到列表开头。`addto` 总是追加到目标组最后，包括在同一父级内重排。
 - 成功执行 `init/read/save/canvas 修改` 清空两个历史栈并设立 IO 屏障，undo 和 redo 均输出题目规定的 `undo not allowed after io command`。下一次成功编辑解除屏障。失败命令不影响文档、路径、undo 或 redo；显示命令和 canvas 查询不影响历史。
 - `save <path>` 成功后该路径成为当前路径，后续 `save` 可复用；`init` 清除路径。保存采用同目录临时文件加 rename；写入失败清理临时文件。错误统一一行 `error:`，文件错误包含原请求路径。
-- undo/redo 回显采用 `undone:` / `redone:` 加原编辑摘要；状态精确恢复。树展示使用 Unicode 分支符，内联几何属性，列间空格不要求逐字符复刻题目示例。
+- undo/redo 回显采用 `undone:` / `redone:` 加原编辑摘要；状态精确恢复。树展示使用 Unicode 分支符并内联几何属性。
 
 ### SVG 读写范围
 
@@ -198,67 +195,3 @@ create g <id>
 支持 `translate` 与正数等比 `scale` 的组合/嵌套；导入时合成为世界坐标，不保留原 transform 字符串。变换导入还会将有效数值/px 描边宽度、字号折算到叶子，保持支持范围内的外观；这与 CLI 的几何缩放命令是两个不同操作。
 
 暂不支持 `path/use/image/defs/tspan`、CSS/style、旋转、非等比缩放、百分比尺寸、DTD/实体声明等；遇到未支持的元素、属性或变换会拒绝整次读入。注释和 XML 格式缩进不参与编辑模型，不保证字节级原样保存。组整体 opacity 不能无损下放为子节点 opacity，因此额外拒绝解散含非 1 opacity 的导入组。这个边界不影响题目规定的 create/set 所能构造的普通组。
-
-## 过程记录
-
-以下记录本次实现中实际发生的决策与修正，没有把尚未执行的验收写成已完成。
-
-1. **确认范围。** 阅读任务后确定实现 Phase 1 的六种内置图形、命令行编辑、SVG 读写与撤销重做，暂不实现后续插件阶段的 `box`。
-2. **先建方案再实现。** 先建立 TypeScript 工程，明确模块依赖和实现计划；随后实现领域模型，再加入应用命令、REPL 和基础设施。
-3. **避免树操作的部分提交。** 分组和递归缩放可能在修改部分节点后失败，因此采用文档副本事务，而不是边改共享状态边校验。测试特意让第二个子节点在缩放时数值溢出，确认第一个子节点的变化也不会提交。
-4. **修正外部 ID 补全策略。** 如果读到缺 ID 的矩形就分配 rect1，会与后面显式 rect1 冲突。实现改为预扫描显式 ID，再补全；测试覆盖未命名组/叶子和后置显式 ID。
-5. **修正编译边界。** 首次编译发现 XML 库的声明使用全局 DOM Element/Node，而非模块导出的同名类型；根据安装后的类型声明调整别名，随后严格编译通过。
-6. **首轮测试发现两处问题。** 37 项测试中，架构检查发现 Tokenizer 直接引用领域层错误类型；改用词法层的原生 SyntaxError，由 CommandProcessor 统一输出。另一个失败来自测试字符串的引号被 JavaScript 预先消耗，改用 String.raw 保留命令中的转义，并确认文本值包含引号。
-7. **补查 round-trip。** 检查发现根 svg 的 ID 原本会被忽略，以及非法的 SVG `text` 属性可能被错误当作创建参数而跳过。补充根 ID 保存/保留名称规则，明确拒绝文本属性的错误表达，同时将 XML 属性收集对象改为无原型对象。增加两个回归测试，最终总数 39，全部通过。
-8. **真实脚本验收。** 回放题目 6.1 的版本 A：创建三层结构、移动并撤销、修改文字、保存，最终输出 8 个元素并生成流程图 SVG。测试还通过独立 CLI 子进程检查脚本错误后继续处理与退出码。
-
-## 一致性自查
-
-### 1. 实际模块划分是否与方案一致
-
-一致。初始方案的 cli/application/domain/infrastructure 四层均对应实际目录，`main.ts` 负责装配。应用层进一步细分 `commands/`，基础设施增加 `Transform` 来处理任务背景中的嵌套平移/等比缩放示例，均属于既有边界内的细化，不改变依赖规则。
-
-生产类逐一独立文件；图形几何、子节点和历史栈均封装，外部获取属性/子节点列表的是副本。模型包含变换、验证、复制和树操作行为，不采用公共数据袋配自由函数操作所有图形的写法。
-
-### 2. 依赖规则是否被违反
-
-最终自动化架构检查通过。曾存在 Tokenizer → domain 的违规，已按过程记录修正，未通过放宽规则掩盖问题。
-
-抽样：
-
-- `MoveCommand → EditCommand / SvgDocument / Value`：应用层只操作领域接口。
-- `Group → Shape / Value / EditorError`：领域层依赖内部类型，不调用 CLI 或 XML。
-- `Session → SvgStore`：依赖应用层端口，不直接导入 FileSvgStore。
-- `FileSvgStore → SvgStore / SvgCodec / SvgDocument`：具体适配器实现端口。
-- `CommandProcessor → CommandRegistry / Session / Tokenizer`：CLI 无直接领域树依赖。
-
-当前没有发现跨层违规。两个集中名称映射是有意保留的后续插件化待重构项；快照成本和树遍历效率是已说明的阶段一取舍，不作为已完成的性能优化。
-
-## 质量保证手段
-
-### 已执行验证
-
-执行 `npm run check`，TypeScript 严格模式编译成功，Node 测试运行器报告 **39 tests / 39 pass / 0 fail**。测试包含以下可观察行为：
-
-| 验证范围 | 证据位置 |
-|---|---|
-| 六种类型、in 父级、几何/文本 set、默认样式 | `test/editor.test.ts` |
-| 容器递归变换、子树删除、分组顺序、跨父级分组、环检查、ungroup 位置与继承样式、z-order | `test/editor.test.ts` |
-| 成功/失败事务、IO 屏障、redo 分支清理、显示命令不改历史、连续 80 次混合操作的逐步撤销与重放 | `test/editor.test.ts` |
-| 参数数量、数值、未知属性/类型/ID/容器、溢出时无部分修改 | `test/editor.test.ts` |
-| XML 特殊字符与 Unicode、命名空间、CDATA、自动 ID、重复 ID、变换、根 ID 和 round-trip | `test/svg.test.ts` |
-| 真实文件保存/覆盖/读回、含空格中文路径、失败读写不改会话、临时文件清理 | `test/svg.test.ts` |
-| 分词转义、注释、REPL 提示符、CRLF、真实 CLI 子进程退出码 | `test/cli.test.ts` |
-| 依赖方向、一类一文件、源码无 switch 分派 | `test/architecture.test.ts` |
-
-另已回放 `examples/flowchart.commands` 并成功生成包含 8 个元素的 SVG。验收主要覆盖功能、序列化语义和程序状态，没有进行跨浏览器截图像素对比或超大文档性能压测。
-
-### 复核命令
-
-```sh
-npm ci
-npm run check
-npm run --silent cli < examples/flowchart.commands
-```
-
-`npm run check` 对源代码严格编译并执行全部测试；无需启动交互 UI。依赖目录 `node_modules` 和构建目录 `dist` 可由上述命令重新生成。
