@@ -38,7 +38,7 @@ export class ShapeFactory {
     const args = def.keys.map(key => key === 'text' ? content : attrs[key] ?? '0');
     const shape = this.create(tag, id, args);
     for (const [key,value] of Object.entries(attrs)) {
-      if (key !== 'id' && key !== 'transform' && key !== 'xmlns' && !def.keys.includes(key)) shape.importPresentation(key, value);
+      if (key !== 'id' && key !== 'transform' && key !== 'xmlns' && !(key !== 'text' && def.keys.includes(key))) shape.importPresentation(key, value);
     }
     return shape;
   }

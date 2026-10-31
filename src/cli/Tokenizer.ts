@@ -1,5 +1,3 @@
-import { EditorError } from '../domain/EditorError.js';
-
 export class Tokenizer {
   parse(line: string): string[] {
     if (line.trimStart().startsWith('#')) return [];
@@ -16,7 +14,7 @@ export class Tokenizer {
         if (started) { tokens.push(token); token = ''; started = false; }
       } else { token += char; started = true; }
     }
-    if (quoted) throw new EditorError('unterminated double quote');
+    if (quoted) throw new SyntaxError('unterminated double quote');
     if (started) tokens.push(token);
     return tokens;
   }

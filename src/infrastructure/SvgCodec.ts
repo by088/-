@@ -29,6 +29,7 @@ export class SvgCodec {
     const width = this.length(attrs.width ?? String(view?.[2] ?? 800),'width');
     const height = this.length(attrs.height ?? String(view?.[3] ?? 600),'height');
     const doc = new SvgDocument(width,height,view?.join(' '));
+    if (attrs.id !== undefined) doc.importRootId(attrs.id);
     for (const [key,value] of Object.entries(attrs)) {
       if (!['xmlns','width','height','viewBox','id','version','transform'].includes(key)) doc.importRootPresentation(key,value);
     }
@@ -93,7 +94,7 @@ export class SvgCodec {
     if (element.namespaceURI && element.namespaceURI !== this.namespace) throw new EditorError(`unsupported SVG namespace: ${element.namespaceURI}`);
   }
   private attributes(element: XmlElement): Record<string,string> {
-    const result: Record<string,string> = {};
+    const result: Record<string,string> = Object.create(null) as Record<string,string>;
     for (let i=0; i<element.attributes.length; i++) {
       const attr = element.attributes.item(i)!;
       if (attr.name.startsWith('xmlns:')) continue;

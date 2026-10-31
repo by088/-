@@ -10,6 +10,7 @@ export class SvgDocument {
   private w: number;
   private h: number;
   private viewport: string;
+  private rootId: string | undefined;
   constructor(width = 800, height = 600, viewBox?: string) {
     this.w = Value.positive(width, 'width'); this.h = Value.positive(height, 'height');
     this.viewport = viewBox ?? `0 0 ${this.w} ${this.h}`;
@@ -20,12 +21,18 @@ export class SvgDocument {
   get children(): readonly Shape[] { return this.root.children; }
   get count(): number { return this.locations().length; }
   rootPresentation(): Readonly<Record<string,string>> {
-    const {id: _id, ...attributes} = this.root.attributes(); return attributes;
+    const {id: _id, ...attributes} = this.root.attributes();
+    return this.rootId === undefined ? attributes : {id: this.rootId, ...attributes};
+  }
+  importRootId(id: string): void {
+    Value.id(id);
+    if (this.has(id)) throw new EditorError(`id already exists: ${id}`);
+    this.rootId = id;
   }
   importRootPresentation(name: string, value: string): void { this.root.importPresentation(name, value); }
   clone(): SvgDocument {
     const copy = new SvgDocument(this.w, this.h, this.viewport);
-    copy.root = this.root.clone() as Group; return copy;
+    copy.root = this.root.clone() as Group; copy.rootId = this.rootId; return copy;
   }
   resize(w: number, h: number): void {
     Value.positive(w, 'width'); Value.positive(h, 'height');
@@ -55,7 +62,7 @@ export class SvgDocument {
     const pending = [shape]; const seen = new Set<string>();
     while (pending.length) {
       const next = pending.pop()!;
-      if (seen.has(next.id) || this.has(next.id)) throw new EditorError(`id already exists: ${next.id}`);
+      if (seen.has(next.id) || this.has(next.id) || next.id === this.rootId) throw new EditorError(`id already exists: ${next.id}`);
       seen.add(next.id); pending.push(...next.children);
     }
     const parent = parentId === undefined ? this.root : this.container(parentId);
@@ -69,7 +76,7 @@ export class SvgDocument {
   }
   group(id: string, ids: readonly string[]): Group {
     Value.id(id);
-    if (this.has(id)) throw new EditorError(`id already exists: ${id}`);
+    if (this.has(id) || id === this.rootId) throw new EditorError(`id already exists: ${id}`);
     if (!ids.length) throw new EditorError('group requires at least one shape');
     if (new Set(ids).size !== ids.length) throw new EditorError('duplicate shape in group');
     const selected = ids.map(key => this.locate(key));
