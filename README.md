@@ -26,5 +26,3 @@ npm run --silent cli < examples/flowchart.commands
 - [流程图命令脚本](examples/flowchart.commands)
 - [生成的流程图](examples/flowchart.svg)
 - [外部 SVG 导入样例](examples/other.svg)
-
-项目采用分阶段 Git 提交管理，最终版本以 `final` 标签标记。已通过 TypeScript 严格编译和 39 项自动化测试，验证范围与结果详见 [质量保证手段](doc/README.md#质量保证手段)。
